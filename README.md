@@ -10,67 +10,58 @@ Mimi Journey 是一個整合 **行事曆規劃**、**地圖路線**、**軌跡�
 
 ```mermaid
 flowchart TB
-  %% ============== Clients ==============
-  subgraph C[Clients]
-    WEB[React Web App\n- Day Planner\n- Map + Timeline\n- Stops/Rest editor\n- Directions preview]
-    MOB[PWA / Mobile Web\n- Background-ish tracking (limited)\n- Quick check-in]
-    EXT[Optional: Browser Extension\n- Quick add from webpages]
+  %% Clients
+  subgraph Clients
+    WEB[React Web App<br/>Planner and Map]
+    MOB[PWA Mobile Web<br/>Tracking and Check-in]
   end
 
-  %% ============== Edge / Auth ==============
-  subgraph E[Edge & Auth]
-    CDN[Static Hosting / CDN\nServe React build]
-    GW[API Gateway / Reverse Proxy\n/nginx or cloud LB]
-    AUTH[Auth Service\nOAuth2 (Google)\nSession/JWT]
+  %% Edge
+  subgraph Edge
+    CDN[Static Hosting CDN]
+    GW[API Gateway]
+    AUTH[Google OAuth]
   end
 
-  %% ============== Backend (Python) ==============
-  subgraph B[Backend (Python)]
-    API[API Server (FastAPI)\nREST + WebSocket/SSE]
-    CAL[Calendar Connector\nSync events\nRead/Write]
-    MAP[Maps Connector\nGeocoding / Places\nDirections / Distance Matrix]
-    PLAN[Planner Engine\n- Itinerary builder\n- Stop insertion\n- Time budgeting\n- Constraints & scoring]
-    TRACE[Trace Service\n- ingest GPS points\n- simplify segments\n- detect stops\n- mode inference (optional)]
-    NOTI[Notifications\nEmail/Push later]
-    WORK[Worker Queue\nCelery/RQ + Redis\nfor sync & heavy jobs]
+  %% Backend
+  subgraph Backend
+    API[FastAPI Server]
+    CAL[Calendar Sync]
+    MAP[Maps Service]
+    PLAN[Planner Engine]
+    TRACE[Trace Processor]
+    WORK[Background Workers]
   end
 
-  %% ============== Data ==============
-  subgraph D[Data Layer]
-    DB[(Postgres + PostGIS\nTrips, days, stops,\ntrace points, segments)]
-    REDIS[(Redis\ncache + queue)]
-    OBJ[(Object Storage\noptional: raw trace logs\nexports)]
+  %% Data
+  subgraph Data
+    DB[(Postgres + PostGIS)]
+    REDIS[(Redis)]
   end
 
-  %% ============== External Services ==============
-  subgraph X[External APIs]
-    GOOG[Google OAuth\nCalendar API\nMaps APIs]
+  %% External
+  subgraph External
+    GOOGLE[Google Calendar and Maps API]
   end
 
-  %% ============== Flows ==============
   WEB --> CDN
   MOB --> CDN
   CDN --> GW
   GW --> AUTH
   AUTH --> API
 
-  API --> DB
-  API --> REDIS
-  API --> OBJ
-
   API --> CAL
   API --> MAP
   API --> PLAN
   API --> TRACE
 
-  CAL --> GOOG
-  MAP --> GOOG
+  CAL --> GOOGLE
+  MAP --> GOOGLE
 
-  WORK --> CAL
-  WORK --> TRACE
+  API --> DB
+  API --> REDIS
   WORK --> DB
-  WORK --> GOOG
-  WORK --> OBJ
+  WORK --> GOOGLE
 ```
 
 ## 核心資料流
