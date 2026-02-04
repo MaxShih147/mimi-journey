@@ -1,0 +1,52 @@
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+npm-debug.log*
+coverage/
+
+# Build
+dist/
+build/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Tests (not needed in production image)
+tests/
+**/tests/
+
+# Spec files
+specs/
+.specify/
+.claude/
+
+# Misc
+*.log
+.DS_Store
+Thumbs.db

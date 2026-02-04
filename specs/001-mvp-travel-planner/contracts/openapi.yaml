@@ -1,0 +1,1164 @@
+openapi: 3.1.0
+info:
+  title: Mimi Journey API
+  description: 旅行規劃與軌跡紀錄 API
+  version: 1.0.0
+  contact:
+    name: Mimi Journey Team
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development
+  - url: https://api.mimi-journey.app/v1
+    description: Production
+
+tags:
+  - name: auth
+    description: 認證相關
+  - name: calendar
+    description: 行事曆整合
+  - name: day-plans
+    description: 行程計畫
+  - name: stops
+    description: 停靠點管理
+  - name: routes
+    description: 路線規劃
+  - name: traces
+    description: 軌跡追蹤
+  - name: places
+    description: 地點搜尋
+
+paths:
+  # ============ Auth ============
+  /auth/google/login:
+    get:
+      tags: [auth]
+      summary: 發起 Google OAuth 登入
+      description: 重定向至 Google 授權頁面
+      responses:
+        "302":
+          description: 重定向至 Google OAuth
+          headers:
+            Location:
+              schema:
+                type: string
+
+  /auth/google/callback:
+    get:
+      tags: [auth]
+      summary: Google OAuth 回調
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: 登入成功，重定向至前端
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: 取得當前用戶資訊
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: 用戶資訊
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: 登出
+      security:
+        - cookieAuth: []
+      responses:
+        "204":
+          description: 登出成功
+
+  # ============ Calendar ============
+  /calendar/events:
+    get:
+      tags: [calendar]
+      summary: 取得行事曆事件
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-02-04"
+      responses:
+        "200":
+          description: 事件列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CalendarEvent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ============ Day Plans ============
+  /day-plans:
+    get:
+      tags: [day-plans]
+      summary: 列出行程計畫
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/PlanStatus"
+      responses:
+        "200":
+          description: 行程列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plans:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DayPlanSummary"
+
+    post:
+      tags: [day-plans]
+      summary: 建立行程計畫
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDayPlanRequest"
+      responses:
+        "201":
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DayPlan"
+        "409":
+          description: 該日期已有行程
+
+  /day-plans/{planId}:
+    get:
+      tags: [day-plans]
+      summary: 取得行程詳情
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PlanId"
+      responses:
+        "200":
+          description: 行程詳情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DayPlan"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      tags: [day-plans]
+      summary: 更新行程
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PlanId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDayPlanRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DayPlan"
+
+    delete:
+      tags: [day-plans]
+      summary: 刪除行程
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PlanId"
+      responses:
+        "204":
+          description: 刪除成功
+
+  /day-plans/{planId}/generate:
+    post:
+      tags: [day-plans]
+      summary: 自動生成行程
+      description: 根據停靠點和交通方式生成完整的時間軸和路線
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PlanId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                optimize_order:
+                  type: boolean
+                  default: false
+                  description: 是否優化停靠順序
+      responses:
+        "200":
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratedItinerary"
+
+  # ============ Stops ============
+  /day-plans/{planId}/stops:
+    get:
+      tags: [stops]
+      summary: 列出停靠點
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PlanId"
+      responses:
+        "200":
+          description: 停靠點列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stops:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Stop"
+
+    post:
+      tags: [stops]
+      summary: 新增停靠點
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PlanId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStopRequest"
+      responses:
+        "201":
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stop"
+
+  /day-plans/{planId}/stops/reorder:
+    post:
+      tags: [stops]
+      summary: 重新排序停靠點
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PlanId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stop_ids]
+              properties:
+                stop_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: 按新順序排列的停靠點 ID
+      responses:
+        "200":
+          description: 排序成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stops:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Stop"
+
+  /day-plans/{planId}/stops/{stopId}:
+    patch:
+      tags: [stops]
+      summary: 更新停靠點
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PlanId"
+        - $ref: "#/components/parameters/StopId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStopRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stop"
+
+    delete:
+      tags: [stops]
+      summary: 刪除停靠點
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PlanId"
+        - $ref: "#/components/parameters/StopId"
+      responses:
+        "204":
+          description: 刪除成功
+
+  # ============ Routes ============
+  /routes/preview:
+    post:
+      tags: [routes]
+      summary: 預覽路線
+      description: 取得多個停靠點之間的路線和預估時間
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoutePreviewRequest"
+      responses:
+        "200":
+          description: 路線預覽
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutePreviewResponse"
+
+  # ============ Traces ============
+  /traces:
+    get:
+      tags: [traces]
+      summary: 列出軌跡
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/TraceStatus"
+      responses:
+        "200":
+          description: 軌跡列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  traces:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TraceSummary"
+
+    post:
+      tags: [traces]
+      summary: 開始追蹤
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                day_plan_id:
+                  type: string
+                  format: uuid
+                  description: 關聯的行程（可選）
+      responses:
+        "201":
+          description: 追蹤已開始
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trace"
+
+  /traces/{traceId}:
+    get:
+      tags: [traces]
+      summary: 取得軌跡詳情
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TraceId"
+        - name: include_points
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: simplified
+          in: query
+          schema:
+            type: boolean
+            default: true
+          description: 是否返回簡化後的軌跡
+      responses:
+        "200":
+          description: 軌跡詳情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trace"
+
+  /traces/{traceId}/stop:
+    post:
+      tags: [traces]
+      summary: 停止追蹤
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TraceId"
+      responses:
+        "200":
+          description: 追蹤已停止
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trace"
+
+  /traces/{traceId}/points:
+    post:
+      tags: [traces]
+      summary: 上傳軌跡點
+      description: 批次上傳 GPS 位置點
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TraceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [points]
+              properties:
+                points:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/TracePointInput"
+                  maxItems: 100
+      responses:
+        "200":
+          description: 上傳成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted_count:
+                    type: integer
+                  rejected_count:
+                    type: integer
+                  current_location:
+                    $ref: "#/components/schemas/Location"
+
+  /traces/{traceId}/stay-points:
+    get:
+      tags: [traces]
+      summary: 取得停留點
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TraceId"
+      responses:
+        "200":
+          description: 停留點列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stay_points:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StayPoint"
+
+  /traces/{traceId}/stay-points/{stayPointId}:
+    patch:
+      tags: [traces]
+      summary: 更新停留點狀態
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TraceId"
+        - name: stayPointId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: "#/components/schemas/StayPointStatus"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StayPoint"
+
+  # ============ Places ============
+  /places/search:
+    get:
+      tags: [places]
+      summary: 搜尋地點
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 搜尋關鍵字
+        - name: location
+          in: query
+          schema:
+            type: string
+          description: "中心點座標 (lat,lng)"
+          example: "25.0330,121.5654"
+      responses:
+        "200":
+          description: 搜尋結果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  places:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Place"
+
+  /places/geocode:
+    get:
+      tags: [places]
+      summary: 地址轉座標
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 地理編碼結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeocodeResult"
+
+  /places/reverse-geocode:
+    get:
+      tags: [places]
+      summary: 座標轉地址
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: 反向地理編碼結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Place"
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_id
+
+  parameters:
+    PlanId:
+      name: planId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    StopId:
+      name: stopId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    TraceId:
+      name: traceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: 未授權
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    NotFound:
+      description: 資源不存在
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    # ---- Common ----
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+    Location:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+
+    # ---- Auth ----
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        picture_url:
+          type: string
+          format: uri
+
+    # ---- Calendar ----
+    CalendarEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        location:
+          type: string
+        location_geocoded:
+          $ref: "#/components/schemas/Location"
+        all_day:
+          type: boolean
+
+    # ---- Day Plans ----
+    PlanStatus:
+      type: string
+      enum: [draft, confirmed, completed]
+
+    TransportMode:
+      type: string
+      enum: [walking, driving, transit, bicycling]
+
+    DayPlanSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        plan_date:
+          type: string
+          format: date
+        title:
+          type: string
+        status:
+          $ref: "#/components/schemas/PlanStatus"
+        stop_count:
+          type: integer
+
+    DayPlan:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        plan_date:
+          type: string
+          format: date
+        title:
+          type: string
+        status:
+          $ref: "#/components/schemas/PlanStatus"
+        default_transport:
+          $ref: "#/components/schemas/TransportMode"
+        stops:
+          type: array
+          items:
+            $ref: "#/components/schemas/Stop"
+        legs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Leg"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateDayPlanRequest:
+      type: object
+      required: [plan_date]
+      properties:
+        plan_date:
+          type: string
+          format: date
+        title:
+          type: string
+        default_transport:
+          $ref: "#/components/schemas/TransportMode"
+        import_calendar:
+          type: boolean
+          default: true
+          description: 是否自動匯入當天行事曆事件
+
+    UpdateDayPlanRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        status:
+          $ref: "#/components/schemas/PlanStatus"
+        default_transport:
+          $ref: "#/components/schemas/TransportMode"
+
+    GeneratedItinerary:
+      type: object
+      properties:
+        stops:
+          type: array
+          items:
+            $ref: "#/components/schemas/Stop"
+        legs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Leg"
+        total_distance_meters:
+          type: integer
+        total_duration_seconds:
+          type: integer
+        conflicts:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [time_overlap, insufficient_travel_time]
+              stop_ids:
+                type: array
+                items:
+                  type: string
+                  format: uuid
+              message:
+                type: string
+
+    # ---- Stops ----
+    StopType:
+      type: string
+      enum: [origin, destination, waypoint, rest_stop]
+
+    StopSource:
+      type: string
+      enum: [calendar, manual, detected]
+
+    Stop:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sequence:
+          type: integer
+        name:
+          type: string
+        address:
+          type: string
+        location:
+          $ref: "#/components/schemas/Location"
+        place_id:
+          type: string
+        stop_type:
+          $ref: "#/components/schemas/StopType"
+        source:
+          $ref: "#/components/schemas/StopSource"
+        scheduled_arrival:
+          type: string
+          format: date-time
+        scheduled_departure:
+          type: string
+          format: date-time
+        stay_duration_minutes:
+          type: integer
+        notes:
+          type: string
+        calendar_event_id:
+          type: string
+
+    CreateStopRequest:
+      type: object
+      required: [name, location]
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        location:
+          $ref: "#/components/schemas/Location"
+        place_id:
+          type: string
+        stop_type:
+          $ref: "#/components/schemas/StopType"
+        scheduled_arrival:
+          type: string
+          format: date-time
+        stay_duration_minutes:
+          type: integer
+          default: 0
+        notes:
+          type: string
+        insert_after_stop_id:
+          type: string
+          format: uuid
+          description: 插入在指定停靠點之後
+
+    UpdateStopRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        location:
+          $ref: "#/components/schemas/Location"
+        scheduled_arrival:
+          type: string
+          format: date-time
+        stay_duration_minutes:
+          type: integer
+        notes:
+          type: string
+
+    # ---- Legs ----
+    Leg:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        from_stop_id:
+          type: string
+          format: uuid
+        to_stop_id:
+          type: string
+          format: uuid
+        sequence:
+          type: integer
+        transport_mode:
+          $ref: "#/components/schemas/TransportMode"
+        distance_meters:
+          type: integer
+        duration_seconds:
+          type: integer
+        polyline:
+          type: string
+          description: Encoded polyline
+
+    # ---- Routes ----
+    RoutePreviewRequest:
+      type: object
+      required: [stops, transport_mode]
+      properties:
+        stops:
+          type: array
+          items:
+            type: object
+            required: [location]
+            properties:
+              id:
+                type: string
+              location:
+                $ref: "#/components/schemas/Location"
+          minItems: 2
+        transport_mode:
+          $ref: "#/components/schemas/TransportMode"
+        optimize_order:
+          type: boolean
+          default: false
+
+    RoutePreviewResponse:
+      type: object
+      properties:
+        legs:
+          type: array
+          items:
+            type: object
+            properties:
+              from_index:
+                type: integer
+              to_index:
+                type: integer
+              distance_meters:
+                type: integer
+              duration_seconds:
+                type: integer
+              polyline:
+                type: string
+        optimized_order:
+          type: array
+          items:
+            type: integer
+          description: 優化後的停靠點索引順序
+        total_distance_meters:
+          type: integer
+        total_duration_seconds:
+          type: integer
+
+    # ---- Traces ----
+    TraceStatus:
+      type: string
+      enum: [active, paused, completed]
+
+    TraceSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/TraceStatus"
+        total_distance_meters:
+          type: integer
+        total_duration_seconds:
+          type: integer
+
+    Trace:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        day_plan_id:
+          type: string
+          format: uuid
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/TraceStatus"
+        total_distance_meters:
+          type: integer
+        total_duration_seconds:
+          type: integer
+        point_count:
+          type: integer
+        polyline:
+          type: string
+          description: 簡化後的軌跡 encoded polyline
+        current_location:
+          $ref: "#/components/schemas/Location"
+
+    TracePointInput:
+      type: object
+      required: [lat, lng, recorded_at]
+      properties:
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        recorded_at:
+          type: string
+          format: date-time
+        accuracy:
+          type: number
+        altitude:
+          type: number
+        speed:
+          type: number
+        heading:
+          type: number
+
+    # ---- Stay Points ----
+    StayPointStatus:
+      type: string
+      enum: [detected, confirmed, ignored]
+
+    StayPoint:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        location:
+          $ref: "#/components/schemas/Location"
+        arrived_at:
+          type: string
+          format: date-time
+        departed_at:
+          type: string
+          format: date-time
+        duration_minutes:
+          type: integer
+        status:
+          $ref: "#/components/schemas/StayPointStatus"
+        place_name:
+          type: string
+        matched_stop_id:
+          type: string
+          format: uuid
+
+    # ---- Places ----
+    Place:
+      type: object
+      properties:
+        place_id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        location:
+          $ref: "#/components/schemas/Location"
+        types:
+          type: array
+          items:
+            type: string
+
+    GeocodeResult:
+      type: object
+      properties:
+        location:
+          $ref: "#/components/schemas/Location"
+        formatted_address:
+          type: string
+        place_id:
+          type: string
