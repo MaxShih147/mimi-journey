@@ -39,16 +39,31 @@ export function StopMarker({
 
     if (!position) return;
 
+    // Create SVG marker for selected state
+    const selectedIcon = {
+      url: 'data:image/svg+xml,' + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+          <circle cx="24" cy="24" r="20" fill="#3b82f6" stroke="#1d4ed8" stroke-width="3"/>
+          <circle cx="24" cy="24" r="8" fill="white"/>
+        </svg>
+      `),
+      scaledSize: new google.maps.Size(48, 48),
+      anchor: new google.maps.Point(24, 24),
+    };
+
     const marker = new google.maps.Marker({
       position,
       map,
       title,
-      label: index !== undefined ? String(index + 1) : undefined,
-      icon: isSelected
+      label: index !== undefined
         ? {
-            url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+            text: String(index + 1),
+            color: isSelected ? '#1d4ed8' : 'white',
+            fontWeight: 'bold',
+            fontSize: isSelected ? '14px' : '12px',
           }
         : undefined,
+      icon: isSelected ? selectedIcon : undefined,
     });
 
     if (onClick) {

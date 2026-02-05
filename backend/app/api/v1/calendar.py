@@ -10,6 +10,7 @@ from app.core.deps import CurrentUserId, DbSession, SessionStore
 from app.core.exceptions import AuthenticationError
 from app.services.auth_service import AuthService
 from app.services.calendar_service import CalendarService
+from app.services.maps_service import MapsService
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
@@ -64,12 +65,26 @@ AccessToken = Annotated[str, Depends(get_access_token)]
 async def get_calendar_events(
     user_id: CurrentUserId,
     access_token: AccessToken,
+    db: DbSession,
     date_param: date = Query(..., alias="date"),
 ) -> CalendarEventsResponse:
-    """Get calendar events for a specific date."""
+    """Get calendar events for a specific date with geocoded locations."""
     calendar_service = CalendarService(access_token)
     events = await calendar_service.get_events_for_date(date_param)
 
-    return CalendarEventsResponse(
-        events=[CalendarEvent(**event) for event in events]
-    )
+    # Geocode locations for events that have them
+    maps_service = MapsService(db)
+    geocoded_events = []
+
+    for event in events:
+        location = event.get("location")
+        if location:
+            try:
+                geocode_result = await maps_service.geocode(location)
+                event["location_geocoded"] = geocode_result["location"]
+            except Exception:
+                event["location_geocoded"] = None
+
+        geocoded_events.append(CalendarEvent(**event))
+
+    return CalendarEventsResponse(events=geocoded_events)

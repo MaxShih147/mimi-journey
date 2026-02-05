@@ -43,8 +43,6 @@ class AuthService:
             Tuple of (auth_url, state, code_verifier)
         """
         state = generate_state()
-        code_verifier = generate_code_verifier()
-        code_challenge = generate_code_challenge(code_verifier)
 
         scopes = [
             "openid",
@@ -53,22 +51,27 @@ class AuthService:
             "https://www.googleapis.com/auth/calendar.readonly",
         ]
 
-        auth_url = build_google_auth_url(
-            client_id=settings.GOOGLE_CLIENT_ID,
-            redirect_uri=settings.GOOGLE_REDIRECT_URI,
-            state=state,
-            code_challenge=code_challenge,
-            scopes=scopes,
-        )
+        # Build simple OAuth URL without PKCE
+        from urllib.parse import urlencode
+        params = {
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+            "response_type": "code",
+            "scope": " ".join(scopes),
+            "state": state,
+            "access_type": "offline",
+            "prompt": "consent",
+        }
+        auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
 
-        # Store state and code_verifier in Redis
+        # Store state in Redis (no code_verifier needed without PKCE)
         await self.session_store.set(
             f"oauth_state:{state}",
-            {"code_verifier": code_verifier},
+            {"code_verifier": ""},
             expire_seconds=OAUTH_STATE_EXPIRE_SECONDS,
         )
 
-        return auth_url, state, code_verifier
+        return auth_url, state, ""
 
     async def handle_callback(self, code: str, state: str) -> tuple[User, str]:
         """
@@ -86,9 +89,7 @@ class AuthService:
         if not state_data:
             raise AuthenticationError("Invalid or expired OAuth state")
 
-        code_verifier = state_data.get("code_verifier")
-        if not code_verifier:
-            raise AuthenticationError("Missing code verifier")
+        code_verifier = state_data.get("code_verifier", "")
 
         # Delete state after use
         await self.session_store.delete(f"oauth_state:{state}")
@@ -110,17 +111,18 @@ class AuthService:
     async def _exchange_code(self, code: str, code_verifier: str) -> dict[str, Any]:
         """Exchange authorization code for tokens."""
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                GOOGLE_TOKEN_URL,
-                data={
-                    "client_id": settings.GOOGLE_CLIENT_ID,
-                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
-                    "code": code,
-                    "code_verifier": code_verifier,
-                    "grant_type": "authorization_code",
-                    "redirect_uri": settings.GOOGLE_REDIRECT_URI,
-                },
-            )
+            data = {
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+            }
+            # Only include code_verifier if using PKCE
+            if code_verifier:
+                data["code_verifier"] = code_verifier
+
+            response = await client.post(GOOGLE_TOKEN_URL, data=data)
 
             if response.status_code != 200:
                 raise ExternalServiceError("Google OAuth", "Failed to exchange authorization code")

@@ -2,6 +2,7 @@
  * Google login button component.
  */
 
+import { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 
 interface LoginButtonProps {
@@ -10,36 +11,48 @@ interface LoginButtonProps {
 
 export function LoginButton({ className = '' }: LoginButtonProps) {
   const { login, isLoading } = useAuth();
+  const [isHovered, setIsHovered] = useState(false);
+
+  const baseStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    width: '100%',
+    padding: '14px 24px',
+    backgroundColor: isHovered ? '#f8fafc' : 'white',
+    color: '#1e293b',
+    border: '2px solid #e2e8f0',
+    borderRadius: '12px',
+    fontSize: '15px',
+    fontWeight: 600,
+    cursor: isLoading ? 'not-allowed' : 'pointer',
+    opacity: isLoading ? 0.7 : 1,
+    transition: 'all 0.2s ease',
+    boxShadow: isHovered
+      ? '0 4px 12px rgba(0, 0, 0, 0.1)'
+      : '0 2px 4px rgba(0, 0, 0, 0.05)',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  };
 
   return (
     <button
       onClick={login}
       disabled={isLoading}
-      className={`login-button ${className}`}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '12px 24px',
-        backgroundColor: '#4285f4',
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        fontSize: '16px',
-        fontWeight: 500,
-        cursor: isLoading ? 'not-allowed' : 'pointer',
-        opacity: isLoading ? 0.7 : 1,
-      }}
+      className={className}
+      style={baseStyle}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       <GoogleIcon />
-      {isLoading ? 'Loading...' : 'Sign in with Google'}
+      <span>{isLoading ? 'Connecting...' : '使用 Google 登入'}</span>
     </button>
   );
 }
 
 function GoogleIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+    <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
       <path
         d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"
         fill="#4285F4"

@@ -45,6 +45,7 @@ def upgrade() -> None:
         "place_cache",
         ["geom"],
         postgresql_using="gist",
+        if_not_exists=True,
     )
 
 

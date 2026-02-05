@@ -1,5 +1,5 @@
 /**
- * Mock map view for demo mode without Google Maps API key.
+ * Mock map view when Google Maps API key is not available.
  */
 
 import type { CalendarEvent } from '../../types';
@@ -18,168 +18,248 @@ export function MockMapView({ events, selectedEventId, onEventClick }: MockMapVi
       style={{
         width: '100%',
         height: '100%',
-        minHeight: '500px',
-        backgroundColor: '#e8f4e8',
+        minHeight: '600px',
+        background: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
         position: 'relative',
         overflow: 'hidden',
-        borderRadius: '8px',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
-      {/* Map background pattern */}
+      {/* Grid pattern overlay */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
           backgroundImage: `
-            linear-gradient(rgba(200, 230, 200, 0.5) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(200, 230, 200, 0.5) 1px, transparent 1px)
+            linear-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.4) 1px, transparent 1px)
           `,
-          backgroundSize: '50px 50px',
+          backgroundSize: '40px 40px',
+          opacity: 0.5,
         }}
       />
 
-      {/* Demo mode banner */}
+      {/* Header */}
       <div
         style={{
-          position: 'absolute',
-          top: '10px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          color: 'white',
-          padding: '8px 16px',
-          borderRadius: '20px',
-          fontSize: '14px',
+          padding: '20px 24px',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'relative',
           zIndex: 10,
         }}
       >
-        Demo Mode - Add VITE_GOOGLE_MAPS_API_KEY for real map
+        <div>
+          <h3 style={{
+            margin: 0,
+            fontSize: '16px',
+            fontWeight: 700,
+            color: '#1e293b',
+          }}>
+            Map Preview
+          </h3>
+          <p style={{
+            margin: '4px 0 0',
+            fontSize: '13px',
+            color: '#64748b',
+          }}>
+            {eventsWithLocation.length} locations with coordinates
+          </p>
+        </div>
+        <div
+          style={{
+            backgroundColor: '#fef3c7',
+            color: '#92400e',
+            padding: '6px 12px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            fontWeight: 600,
+          }}
+        >
+          Maps API key required
+        </div>
       </div>
 
-      {/* Markers */}
-      {eventsWithLocation.map((event, index) => {
-        const isSelected = event.id === selectedEventId;
-        // Position markers in a rough layout based on their coordinates
-        const x = ((event.location_geocoded!.lng - 121.5) * 2000 + 200) % 400 + 50;
-        const y = ((25.1 - event.location_geocoded!.lat) * 2000 + 100) % 300 + 80;
-
-        return (
-          <div
-            key={event.id}
-            onClick={() => onEventClick?.(event)}
-            style={{
-              position: 'absolute',
-              left: `${x}px`,
-              top: `${y}px`,
-              cursor: 'pointer',
-              zIndex: isSelected ? 20 : 10,
-              transform: 'translate(-50%, -100%)',
-            }}
-          >
-            {/* Marker pin */}
-            <div
-              style={{
-                width: '30px',
-                height: '40px',
-                position: 'relative',
-              }}
-            >
-              <svg viewBox="0 0 24 36" fill="none" style={{ width: '100%', height: '100%' }}>
-                <path
-                  d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24c0-6.6-5.4-12-12-12z"
-                  fill={isSelected ? '#2196F3' : '#F44336'}
-                />
-                <circle cx="12" cy="12" r="6" fill="white" />
-                <text
-                  x="12"
-                  y="16"
-                  textAnchor="middle"
-                  fontSize="10"
-                  fontWeight="bold"
-                  fill={isSelected ? '#2196F3' : '#F44336'}
-                >
-                  {index + 1}
-                </text>
-              </svg>
-            </div>
-
-            {/* Info popup for selected marker */}
-            {isSelected && (
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: '45px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  backgroundColor: 'white',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-                  minWidth: '200px',
-                  zIndex: 30,
-                }}
-              >
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '14px' }}>{event.title}</h4>
-                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>
-                  {event.location}
-                </p>
-                <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
-                  {formatTime(event.start_time)} - {formatTime(event.end_time)}
-                </p>
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      {/* Legend */}
+      {/* Location list */}
       <div
         style={{
-          position: 'absolute',
-          bottom: '10px',
-          right: '10px',
-          backgroundColor: 'white',
-          padding: '10px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          fontSize: '12px',
+          flex: 1,
+          padding: '20px 24px',
+          overflowY: 'auto',
+          position: 'relative',
+          zIndex: 5,
         }}
       >
-        <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Taipei Day Trip</div>
-        {eventsWithLocation.map((event, index) => (
+        {eventsWithLocation.length === 0 ? (
           <div
-            key={event.id}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '4px',
-              cursor: 'pointer',
-              padding: '2px 4px',
-              borderRadius: '4px',
-              backgroundColor: event.id === selectedEventId ? '#e3f2fd' : 'transparent',
+              textAlign: 'center',
+              padding: '60px 20px',
+              color: '#64748b',
             }}
-            onClick={() => onEventClick?.(event)}
           >
-            <span
-              style={{
-                width: '20px',
-                height: '20px',
-                borderRadius: '50%',
-                backgroundColor: event.id === selectedEventId ? '#2196F3' : '#F44336',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '11px',
-                fontWeight: 'bold',
-              }}
-            >
-              {index + 1}
-            </span>
-            <span>{event.title}</span>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
+            <p style={{ margin: 0, fontSize: '15px' }}>
+              No geocoded locations to display
+            </p>
+            <p style={{ margin: '8px 0 0', fontSize: '13px', opacity: 0.8 }}>
+              Add locations to your calendar events
+            </p>
           </div>
-        ))}
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {eventsWithLocation.map((event, index) => {
+              const isSelected = event.id === selectedEventId;
+              return (
+                <div
+                  key={event.id}
+                  onClick={() => onEventClick?.(event)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '16px',
+                    padding: '16px',
+                    backgroundColor: isSelected ? 'white' : 'rgba(255, 255, 255, 0.7)',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: isSelected
+                      ? '0 8px 24px rgba(102, 126, 234, 0.2)'
+                      : '0 2px 8px rgba(0, 0, 0, 0.05)',
+                    border: isSelected
+                      ? '2px solid #667eea'
+                      : '2px solid transparent',
+                  }}
+                  onMouseOver={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.1)';
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.05)';
+                    }
+                  }}
+                >
+                  {/* Number badge */}
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      backgroundColor: isSelected ? '#667eea' : '#e2e8f0',
+                      color: isSelected ? 'white' : '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {index + 1}
+                  </div>
+
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: '14px',
+                        color: '#1e293b',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      {event.title}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '13px',
+                        color: '#64748b',
+                        marginBottom: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <span>📍</span>
+                      <span style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {event.location}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '8px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <span
+                        style={{
+                          backgroundColor: '#f1f5f9',
+                          color: '#475569',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {formatTime(event.start_time)} - {formatTime(event.end_time)}
+                      </span>
+                      {event.location_geocoded && (
+                        <span
+                          style={{
+                            backgroundColor: '#dcfce7',
+                            color: '#166534',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 500,
+                          }}
+                        >
+                          {event.location_geocoded.lat.toFixed(4)}, {event.location_geocoded.lng.toFixed(4)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Footer hint */}
+      <div
+        style={{
+          padding: '16px 24px',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(10px)',
+          borderTop: '1px solid rgba(0, 0, 0, 0.05)',
+          textAlign: 'center',
+          fontSize: '12px',
+          color: '#64748b',
+          position: 'relative',
+          zIndex: 10,
+        }}
+      >
+        Set <code style={{
+          backgroundColor: '#f1f5f9',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontFamily: 'monospace',
+        }}>VITE_GOOGLE_MAPS_API_KEY</code> to enable interactive map
       </div>
     </div>
   );

@@ -54,7 +54,6 @@ export function MapView({
       defaultZoom={zoom}
       gestureHandling="greedy"
       disableDefaultUI={false}
-      mapId="mimi-journey-map"
       style={{
         width: '100%',
         height: '100%',
